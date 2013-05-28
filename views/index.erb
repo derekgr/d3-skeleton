@@ -1,1 +1,82 @@
-hello world!
+<div id="viz">
+</div>
+
+<script type="text/javascript">
+function render(followers, stars, repos) {
+  var languages = {};
+  var totalRepos = 0;
+  repos.forEach(function(repo) {
+    if (repo.language) {
+      totalRepos++;
+      languages[repo.language] = (languages[repo.language] || 0) + 1;
+    }
+  });
+
+  var data = [];
+  for(var lang in languages) {
+    data.push({ language: lang, count: languages[lang], freq: languages[lang]/totalRepos });
+  }
+
+  var height = 500, width = 500;
+  var padHoriz = 50;
+  var padVert = 10;
+
+  var svg = d3.select("#viz").append("svg").attr("width", width + padHoriz*2).attr("height", height + padVert*2);
+  var box = svg.append("g").attr("transform", "translate(" + padHoriz + "," + padVert + ")");
+
+  var barMargin = 5;
+  var barWidth = (width - barMargin*data.length)/data.length;
+  var extent = d3.extent(data, function(d) { return d.freq; });
+  extent[1] = extent[1] + 0.1;
+
+  var barHeight = d3.scale.linear().domain(extent).range([0, height]);
+
+  var yRev = d3.scale.linear().domain(extent).range([height, 0]);
+  var x = d3.scale.ordinal().domain(d3.range(data.length)).rangePoints([0, width], 1);
+
+  data = data.sort(function(a, b) {
+    return d3.descending(a.freq, b.freq);
+  });
+
+  var percent = d3.format("%");
+  var axis = d3.svg.axis()
+    .scale(yRev)
+    .tickFormat(percent)
+    .orient("left");
+
+  var colors = d3.scale.category20().domain(d3.range(data.length));
+
+  var rects = box.selectAll("rect").data(data).enter()
+                .append("rect")
+                .attr("x", function(d,i) { return x(i); })
+                .attr("height", function(d) { return barHeight(d.freq); })
+                .attr("width", barWidth)
+                .attr("y", function(d) { return height - barHeight(d.freq); })
+                .attr("fill", function(d,i) { return colors(i); })
+                .append("title")
+                .text(function(d) { return d.language; });
+
+   box.append("g").attr("class", "axis").call(axis);
+
+   box.append("g")
+    .attr("transform", "translate(0," + height + ") rotate(-90)")
+    .selectAll("text").data(data).enter()
+    .append("text")
+    .attr("class", "language-name")
+    .attr("y", function(d,i) { return x(i) + barWidth; })
+    .attr("x", function(d) { return barHeight(d.freq) + 4; })
+    .text(function(d) { return d.language; });
+}
+
+function load() {
+  d3.json('/data/followers.json', function(followers) {
+    d3.json('/data/stars.json', function(stars) {
+      d3.json('/data/repos.json', function(repos) {
+        render(followers, stars, repos);
+      });
+    });
+  });
+}
+
+$(function() { load() ; });
+</script>
